@@ -1,0 +1,404 @@
+-- 🟢 LOAD RAYFIELD UI LIBRARY
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- 🟢 CREATE MAIN WINDOW (SHADOW HUB 🌑)
+local Window = Rayfield:CreateWindow({
+   Name = "SHADOW HUB | Trap N Bang",
+   Icon = nil,
+   LoadingTitle = "🌑 WELCOME TO SHADOW HUB...",
+   LoadingSubtitle = "LOADING SCRIPTS & FEATURES ⚙️",
+   Theme = "Ocean",
+   DisableRayfieldPrompts = false,
+   DisableBuildWarnings = false,
+   ConfigurationSaving = {
+      Enabled = false,
+      FolderName = "ShadowHub",
+      FileName = "ShadowHub_Config"
+   },
+   Discord = {
+      Enabled = false,
+      Invite = "noinvitelink",
+      RememberJoins = true
+   },
+   KeySystem = true,
+   KeySettings = {
+      Title = "🌑 SHADOW HUB | KEY SYSTEM 🔑",
+      Subtitle = "ENTER YOUR KEY TO CONTINUE",
+      Note = "JOIN OUR DISCORD FOR THE LATEST KEY!",
+      FileName = "ShadowHub_Key",
+      SaveKey = true,
+      GrabKeyFromSite = true,
+      Key = {"https://pastebin.com/raw/rvEuneZj"}
+   }
+})
+
+-- 🟢 CREATE TABS
+local PlayerTab = Window:CreateTab("👤 PLAYER", nil)
+local TeleportsTab = Window:CreateTab("🚀 TELEPORTS", nil)
+local AutoFarmTab = Window:CreateTab("🍽️ AUTO FARM", nil)
+local MiscTab = Window:CreateTab("🔍 MISC", nil)
+
+-- 🟢 SERVICES
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local ProximityPromptService = game:GetService("ProximityPromptService")
+local Camera = workspace.CurrentCamera
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+local autoFarmEnabled = false
+local instantInteractEnabled = false
+local spamEConnection
+local spinConnection
+local noclipEnabled = false
+local noclipConnection
+local instantInteractConnection
+
+-- 🟢 SAFE FLY FUNCTION
+local function flyTo(destination)
+    if not rootPart then return end
+    local speed = 50
+    local targetPosition = destination - Vector3.new(0, 3, 0)
+    local function smoothMove(target)
+        local distance = (target - rootPart.Position).Magnitude
+        local flightTime = distance / speed
+        local startPos = rootPart.Position
+        local startTime = tick()
+        while tick() - startTime < flightTime do
+            local progress = math.clamp((tick() - startTime) / flightTime, 0, 1)
+            rootPart.CFrame = CFrame.new(startPos:Lerp(target, progress))
+            task.wait(0.02)
+        end
+        rootPart.CFrame = CFrame.new(target)
+    end
+    smoothMove(targetPosition)
+end
+
+-- 🟢 RESTORED & FIXED AUTO FARM WITH PAUSE AND CONTINUE
+AutoFarmTab:CreateToggle({
+    Name = "🍽️ AUTO FARM 🍽️",
+    CurrentValue = false,
+    Flag = "AutoFarm",
+    Callback = function(Value)
+        autoFarmEnabled = Value
+        if autoFarmEnabled then
+            -- Enable Instant Interact
+            instantInteractEnabled = true
+            instantInteractConnection = ProximityPromptService.PromptButtonHoldBegan:Connect(function(prompt)
+                if instantInteractEnabled then
+                    prompt.HoldDuration = 0
+                    prompt.RequiresLineOfSight = false
+                    prompt:InputHoldBegin()
+                    task.wait()
+                    prompt:InputHoldEnd()
+                end
+            end)
+
+            -- Safe TP to First Spot
+            flyTo(Vector3.new(125.7, 5.4, 1240.5))
+            task.wait(1)
+
+            -- Press "E" to Start Task (Instantly)
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            task.wait(0.1)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+
+            -- Wait for Space Key Press to Continue
+            local spacePressed = false
+            local spaceConnection
+            spaceConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+                if gameProcessed then return end
+                if input.KeyCode == Enum.KeyCode.Space then
+                    spacePressed = true
+                    spaceConnection:Disconnect()
+                end
+            end)
+
+            -- Wait until Space is pressed to move to the second spot
+            repeat task.wait(0.1) until spacePressed
+
+            -- Safe TP to Second Spot
+            flyTo(Vector3.new(120.0, 5.4, 1264.1))
+            task.wait(1)
+            rootPart.Anchored = true
+
+            -- Rotate Camera
+            spinConnection = RunService.RenderStepped:Connect(function()
+                Camera.CFrame = Camera.CFrame * CFrame.Angles(0, -math.rad(1), 0)
+            end)
+
+            -- Spam "E" for Farming (No cooldown, continuous press)
+            spamEConnection = RunService.RenderStepped:Connect(function()
+                if autoFarmEnabled then
+                    -- Send E press continuously
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                    task.wait(0.1) -- Small delay to simulate button press
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                end
+            end)
+        else
+            autoFarmEnabled = false
+            instantInteractEnabled = false
+            rootPart.Anchored = false
+
+            if instantInteractConnection then
+                instantInteractConnection:Disconnect()
+                instantInteractConnection = nil
+            end
+
+            if spinConnection then
+                spinConnection:Disconnect()
+                spinConnection = nil
+            end
+
+            if spamEConnection then
+                spamEConnection:Disconnect()
+                spamEConnection = nil
+            end
+        end
+    end
+})
+
+-- 🟢 PLAYER FEATURES
+PlayerTab:CreateToggle({ 
+    Name = "💀 GOD MODE (not working)", 
+    Callback = function(Value) 
+        if Value then
+            humanoid.MaxHealth = math.huge
+            humanoid.Health = math.huge
+            humanoid:GetPropertyChangedSignal("Health"):Connect(function()
+                humanoid.Health = math.huge
+            end)
+        else
+            humanoid.MaxHealth = 100
+            humanoid.Health = 100
+        end
+    end 
+})
+
+PlayerTab:CreateToggle({ 
+    Name = "🚀 NOCLIP", 
+    Callback = function(Value) 
+        noclipEnabled = Value
+        if noclipEnabled then 
+            noclipConnection = RunService.Stepped:Connect(function()
+                for _, part in pairs(character:GetDescendants()) do 
+                    if part:IsA("BasePart") then 
+                        part.CanCollide = false 
+                    end 
+                end 
+            end) 
+        else 
+            if noclipConnection then
+                noclipConnection:Disconnect()
+                noclipConnection = nil
+            end
+            for _, part in pairs(character:GetDescendants()) do 
+                if part:IsA("BasePart") then 
+                    part.CanCollide = true 
+                end 
+            end 
+        end 
+    end 
+})
+
+-- 🟢 TELEPORT BUTTON (CTRL + CLICK)
+PlayerTab:CreateButton({
+    Name = "Click to TP (CTRL + CLICK)",
+    Callback = function()
+        local UIS = game:GetService("UserInputService")
+        local Player = game.Players.LocalPlayer
+        local Mouse = Player:GetMouse()
+
+        function GetCharacter()
+            return game.Players.LocalPlayer.Character
+        end
+
+        function Teleport(pos)
+            local Char = GetCharacter()
+            if Char then
+                Char:MoveTo(pos)
+            end
+        end
+
+        -- Listen for mouse click and CTRL key press
+        UIS.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 and UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
+                Teleport(Mouse.Hit.p)
+            end
+        end)
+    end
+})
+
+-- 🟢 TELEPORT TO HOUSES WITH SLIGHT UNDERGROUND MOVEMENT
+TeleportsTab:CreateButton({
+    Name = "🏠 HOUSES",
+    Callback = function()
+        local targetPosition = Vector3.new(1246.6, 6.4, 530.9)
+        local undergroundPosition = targetPosition - Vector3.new(0, 10, 0) -- Move 5 studs underground (just below the ground)
+
+        -- First, fly to a position just below the ground (head disappears)
+        flyTo(undergroundPosition)
+
+        -- Wait for the underground position flight to finish
+        task.wait(1)
+
+        -- Then, rise up to the final target position
+        flyTo(targetPosition)  -- Complete the movement to the target position
+    end
+})
+
+-- 🟢 TELEPORT TO HOUSES WITH SLIGHT UNDERGROUND MOVEMENT
+TeleportsTab:CreateButton({
+    Name = "🚗 GARAGE",
+    Callback = function()
+        local targetPosition = Vector3.new(136.6, 16.4, 483.2)
+        local undergroundPosition = targetPosition - Vector3.new(0, 10, 0) -- Move 5 studs underground (just below the ground)
+
+        -- First, fly to a position just below the ground (head disappears)
+        flyTo(undergroundPosition)
+
+        -- Wait for the underground position flight to finish
+        task.wait(1)
+
+        -- Then, rise up to the final target position
+        flyTo(targetPosition)  -- Complete the movement to the target position
+    end
+})
+
+-- 🟢 TELEPORT TO LIDL WITH SLIGHT UNDERGROUND MOVEMENT
+TeleportsTab:CreateButton({
+    Name = "🛒 LIDL",
+    Callback = function()
+        local targetPosition = Vector3.new(90.1, 3.3, 463.3)
+        local undergroundPosition = targetPosition - Vector3.new(0, 0, 0) -- Move 5 studs underground (just below the ground)
+
+        -- First, fly to a position just below the ground (head disappears)
+        flyTo(undergroundPosition)
+        -- Then, rise up to the final target position
+        flyTo(targetPosition)  -- Complete the movement to the target position
+    end
+})
+
+-- 🟢 TELEPORT TO VANS WITH SLIGHT UNDERGROUND MOVEMENT
+TeleportsTab:CreateButton({
+    Name = "🚐 VANS",
+    Callback = function()
+        local targetPosition = Vector3.new(2199.4, 3.1, -6488.0)
+        local undergroundPosition = targetPosition - Vector3.new(0, 0, 0) -- Move 5 studs underground (just below the ground)
+
+        -- First, fly to a position just below the ground (head disappears)
+        flyTo(undergroundPosition)
+        -- Then, rise up to the final target position
+        flyTo(targetPosition)  -- Complete the movement to the target position
+    end
+})
+
+-- 🟢 TELEPORT TO BAGS WITH SLIGHT UNDERGROUND MOVEMENT
+TeleportsTab:CreateButton({
+    Name = "🎒 BACKPACK",
+    Callback = function()
+        local targetPosition = Vector3.new(368.2, 3.4, 180.8)
+        local undergroundPosition = targetPosition - Vector3.new(0, 0, 0) -- Move 5 studs underground (just below the ground)
+
+        -- First, fly to a position just below the ground (head disappears)
+        flyTo(undergroundPosition)
+        -- Then, rise up to the final target position
+        flyTo(targetPosition)  -- Complete the movement to the target position
+    end
+})
+
+-- 🟢 ESP BUTTON
+MiscTab:CreateButton({
+    Name = "🔍 ESP(F4/F3)",
+    Callback = function()
+        pcall(function()
+            loadstring(game:HttpGet('https://raw.githubusercontent.com/ic3w0lf22/Unnamed-ESP/master/UnnamedESP.lua'))()
+        end)
+    end
+})
+    
+-- 🟢 Rejoin BUTTON
+MiscTab:CreateButton({
+    Name = "🔁 REJOIN SERVER",
+    Callback = function()
+        pcall(function()
+local ts = game:GetService("TeleportService")
+
+local p = game:GetService("Players").LocalPlayer
+
+
+
+ts:TeleportToPlaceInstance(game.PlaceId, game.JobId, p)
+        end)
+    end
+})
+
+-- 🟢 ANTI-AFK FUNCTION
+local lastInputTime = tick()
+local idleTimeLimit = 300 -- Time in seconds before AFK kick (e.g., 300 seconds = 5 minutes)
+
+-- Function to reset the AFK timer whenever there is user input
+local function resetAFKTimer()
+    lastInputTime = tick()
+end
+
+-- Function to simulate activity (e.g., mouse move) when idle for too long
+local function simulateActivity()
+    while true do
+        if tick() - lastInputTime > idleTimeLimit then
+            -- Simulate some activity here (e.g., mouse movement)
+            -- Example: Simulate a slight mouse move
+            game:GetService("UserInputService").InputChanged:Fire({
+                UserInputType = Enum.UserInputType.MouseMovement,
+                Position = Vector2.new(0, 0) -- Move the mouse slightly
+            })
+            wait(60) -- Simulate activity every 60 seconds if idle for too long
+        end
+        wait(1)
+    end
+end
+
+-- Listen for player input to reset the AFK timer
+local userInputConnection
+userInputConnection = game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    resetAFKTimer() -- Reset AFK timer on user input
+end)
+
+-- Start Anti-AFK simulation
+local simulateConnection = spawn(function()
+    simulateActivity()
+end)
+
+-- 🟢 FUNCTION TO END THE SCRIPT AND CLEAN UP
+local function endScript()
+    -- Disconnect connections to stop the script
+    if userInputConnection then
+        userInputConnection:Disconnect()
+        userInputConnection = nil
+    end
+
+    -- Stop the simulateActivity function
+    if simulateConnection then
+        simulateConnection:Disconnect()
+        simulateConnection = nil
+    end
+
+    print("Anti-AFK script has been ended and cleaned up.")
+end
+
+-- Call the endScript function when you want to stop the Anti-AFK script
+-- Example: endScript() -- This would stop the script
+
+-- If you want it to stop when the player leaves, you can use:
+game.Players.LocalPlayer.AncestryChanged:Connect(function(_, parent)
+    if not parent then
+        endScript() -- End the script when the player leaves
+    end
+end)
