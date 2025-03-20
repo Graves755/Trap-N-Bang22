@@ -402,3 +402,63 @@ game.Players.LocalPlayer.AncestryChanged:Connect(function(_, parent)
         endScript() -- End the script when the player leaves
     end
 end)
+
+-- 🟢 Trap N Bang Group Notification (Roles + Rank)
+local Players = game:GetService("Players")
+local GroupService = game:GetService("GroupService")
+local SoundService = game:GetService("SoundService")
+local GROUP_ID = 32812072  -- Trap N Bang Group ID
+local notificationSoundId = "rbxassetid://6026984224" -- Notification sound (can change if needed)
+
+-- List of roles that should trigger notifications
+local targetRoles = {
+    "Trial Moderator",
+    "Moderator",
+    "Administrator",
+    "Head Administrator",
+    "Staff Manager",
+    "Community Manager",
+    "Developer",
+    "realtugs",
+    "ReaalCY"
+}
+
+-- Function to send notification
+local function sendNotification(playerName, playerRank)
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "⚠️ Admin/Mod Joined!",
+        Text = playerName .. " (" .. playerRank .. ") has joined your game!",
+        Duration = 5
+    })
+
+    -- Play notification sound
+    local sound = Instance.new("Sound")
+    sound.SoundId = notificationSoundId
+    sound.Volume = 2
+    sound.Parent = SoundService
+    sound:Play()
+
+    task.wait(5) -- Wait before removing sound
+    sound:Destroy()
+end
+
+-- Check if a joining player has one of the target roles
+Players.PlayerAdded:Connect(function(player)
+    task.spawn(function()
+        local success, groupInfo = pcall(function()
+            return GroupService:GetGroupInfoAsync(GROUP_ID)
+        end)
+
+        if success and groupInfo then
+            local playerRole = player:GetRoleInGroup(GROUP_ID)
+            
+            -- Check if player's role matches one of the target roles
+            if table.find(targetRoles, playerRole) then
+                -- Get the player's rank in the group
+                local playerRank = player:GetRankInGroup(GROUP_ID)
+                -- Send notification with username and rank
+                sendNotification(player.Name, playerRank)
+            end
+        end
+    end)
+end)
